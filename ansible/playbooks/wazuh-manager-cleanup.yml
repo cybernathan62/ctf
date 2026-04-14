@@ -1,0 +1,32 @@
+---
+- name: Cleanup Wazuh manager agents
+  hosts: wazuh_server
+  become: true
+
+  tasks:
+    - name: Get agents list
+      ansible.builtin.command: /var/ossec/bin/manage_agents -l
+      register: agents_list
+      changed_when: false
+
+    - name: Remove non-final agents
+      ansible.builtin.shell: |
+        /var/ossec/bin/manage_agents -l | awk -F'[:, ]+' '{print $3 " " $5}' | while read id name; do
+          if [[ "$name" != final-* && "$name" != "" ]]; then
+            echo "Removing $name ($id)"
+            /var/ossec/bin/manage_agents -r "$id"
+          fi
+        done
+      args:
+        executable: /bin/bash
+      register: cleanup_result
+      failed_when: false
+
+    - name: Restart Wazuh manager
+      ansible.builtin.systemd:
+        name: wazuh-manager
+        state: restarted
+
+    - name: Show cleanup result
+      ansible.builtin.debug:
+        var: cleanup_result.stdout_lines

@@ -1,0 +1,29 @@
+.vagrant/
+tmp/
+*.log
+*.tmp
+*.retry
+*.retry.json
+
+# clés privées
+keys/ssh/**/*
+!keys/ssh/**/.gitkeep
+
+# si tu veux garder l’arborescence des dossiers de clés
+!keys/
+!keys/ssh/
+!keys/ssh/debian/
+!keys/ssh/pfsense/
+!keys/ssh/vagrant/
+!keys/ssh/windows/
+
+# artefacts locaux
+*.box
+*.iso
+
+# éditeur / os
+.vscode/
+.DS_Store
+Thumbs.db
+backup/
+isos/

@@ -1,0 +1,37 @@
+---
+- name: Install MariaDB on db-server
+  hosts: db-server
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install MariaDB packages
+      apt:
+        name:
+          - mariadb-server
+          - mariadb-client
+          - python3-pymysql
+        state: present
+
+    - name: Ensure MariaDB is enabled
+      systemd:
+        name: mariadb
+        enabled: true
+        state: started
+
+    - name: Configure bind-address
+      lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: '^bind-address\s*='
+        line: 'bind-address = 0.0.0.0'
+      notify: Restart MariaDB
+
+  handlers:
+    - name: Restart MariaDB
+      systemd:
+        name: mariadb
+        state: restarted

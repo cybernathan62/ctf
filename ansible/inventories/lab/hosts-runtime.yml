@@ -1,0 +1,71 @@
+all:
+  children:
+    pfsense:
+      hosts:
+        pfsense-1:
+          ansible_host: host.docker.internal
+          ansible_port: 2321
+          ansible_user: admin
+          ansible_ssh_private_key_file: ../keys/ssh/pfsense/pfsense_admin
+        pfsense-2:
+          ansible_host: host.docker.internal
+          ansible_port: 2407
+          ansible_user: admin
+          ansible_ssh_private_key_file: ../keys/ssh/pfsense/pfsense_admin
+        pfsense-3:
+          ansible_host: host.docker.internal
+          ansible_port: 2408
+          ansible_user: admin
+          ansible_ssh_private_key_file: ../keys/ssh/pfsense/pfsense_admin
+
+    debian:
+      hosts:
+        bastion:
+          ansible_host: host.docker.internal
+          ansible_port: 2401
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+        dmz:
+          ansible_host: host.docker.internal
+          ansible_port: 2402
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+        zabbix:
+          ansible_host: host.docker.internal
+          ansible_port: 2404
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+        wazuh:
+          ansible_host: host.docker.internal
+          ansible_port: 2403
+          ansible_user: vagrant
+          ansible_ssh_private_key_file: ../keys/ssh/vagrant/vagrant.key.rsa
+          ansible_ssh_common_args: '-o IdentitiesOnly=yes -o PasswordAuthentication=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa -o StrictHostKeyChecking=no'
+        db-server:
+          ansible_host: host.docker.internal
+          ansible_port: 2405
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+
+    wazuh_server:
+      hosts:
+        wazuh:
+
+    wazuh_agents:
+      hosts:
+        bastion:
+          wazuh_manager_ip: "10.2.50.10"
+          wazuh_manager_port: 1514
+          wazuh_manager_protocol: "tcp"
+        dmz:
+          wazuh_manager_ip: "10.2.50.10"
+          wazuh_manager_port: 1514
+          wazuh_manager_protocol: "tcp"
+        zabbix:
+          wazuh_manager_ip: "10.2.50.10"
+          wazuh_manager_port: 1514
+          wazuh_manager_protocol: "tcp"
+        db-server:
+          wazuh_manager_ip: "10.2.50.10"
+          wazuh_manager_port: 1514
+          wazuh_manager_protocol: "tcp"

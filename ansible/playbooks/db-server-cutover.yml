@@ -1,0 +1,39 @@
+- name: DB-SERVER network cutover
+  hosts: db-server
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Backup interfaces
+      copy:
+        src: /etc/network/interfaces
+        dest: /etc/network/interfaces.bak
+        remote_src: true
+
+    - name: Write final interfaces config
+      copy:
+        dest: /etc/network/interfaces
+        mode: "0644"
+        content: |
+          source /etc/network/interfaces.d/*
+
+          auto lo
+          iface lo inet loopback
+
+          auto enp0s8
+          iface enp0s8 inet static
+              address 10.3.60.10
+              netmask 255.255.255.0
+              gateway 10.3.60.1
+              dns-nameservers 1.1.1.1 8.8.8.8
+
+    - name: Launch cutover in background
+      shell: |
+        nohup bash -c '
+        systemctl restart networking || true
+        ip link set enp0s3 down || true
+        ip addr flush dev enp0s3 || true
+        ip route del default via 10.0.2.2 dev enp0s3 || true
+        ' >/root/cutover.log 2>&1 </dev/null &
+      async: 1
+      poll: 0

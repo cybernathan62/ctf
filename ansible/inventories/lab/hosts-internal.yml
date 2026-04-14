@@ -1,0 +1,53 @@
+all:
+  children:
+    debian:
+      hosts:
+        bastion:
+          ansible_host: host.docker.internal
+          ansible_port: 2401
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+          ansible_ssh_common_args: '-o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+        dmz:
+          ansible_host: 10.1.30.10
+          ansible_port: 22
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+          ansible_ssh_common_args: '-o ProxyCommand="ssh -i ../keys/ssh/debian/debian_admin -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p -p 2401 debian@host.docker.internal" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+        zabbix:
+          ansible_host: 10.2.50.20
+          ansible_port: 22
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+          ansible_ssh_common_args: '-o ProxyCommand="ssh -i ../keys/ssh/debian/debian_admin -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p -p 2401 debian@host.docker.internal" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+        wazuh:
+          ansible_host: 10.2.50.10
+          ansible_port: 22
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+          ansible_ssh_common_args: '-o ProxyCommand="ssh -i ../keys/ssh/debian/debian_admin -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p -p 2401 debian@host.docker.internal" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+        db-server:
+          ansible_host: 10.3.60.10
+          ansible_port: 22
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+          ansible_ssh_common_args: '-o ProxyCommand="ssh -i ../keys/ssh/debian/debian_admin -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -W %h:%p -p 2401 debian@host.docker.internal" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+    wazuh_server:
+      hosts:
+        wazuh:
+
+    aio:
+      hosts:
+        wazuh:
+
+    wazuh_agents:
+      hosts:
+        bastion:
+        dmz:
+        zabbix:
+        db-server:

@@ -1,0 +1,167 @@
+---
+- name: Deploy Wazuh agents (install + configure + enroll)
+  hosts: wazuh_agents
+  become: true
+  gather_facts: true
+
+  vars:
+    wazuh_repo_keyring: /usr/share/keyrings/wazuh.gpg
+    wazuh_repo_file: /etc/apt/sources.list.d/wazuh.list
+    wazuh_repo_line: "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main"
+
+    wazuh_manager_ip: "{{ hostvars['wazuh']['wazuh_manager_ip'] | default('10.2.50.10') }}"
+    wazuh_manager_port: "{{ hostvars[inventory_hostname]['wazuh_manager_port'] | default(1514) }}"
+    wazuh_manager_protocol: "{{ hostvars[inventory_hostname]['wazuh_manager_protocol'] | default('tcp') }}"
+    wazuh_agent_name: "final-{{ inventory_hostname }}"
+
+  tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg
+          - apt-transport-https
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: Ensure keyring directory exists
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Install Wazuh GPG key
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --dearmor -o {{ wazuh_repo_keyring }}
+        chmod 0644 {{ wazuh_repo_keyring }}
+      args:
+        creates: "{{ wazuh_repo_keyring }}"
+
+    - name: Add Wazuh repository
+      ansible.builtin.copy:
+        dest: "{{ wazuh_repo_file }}"
+        mode: "0644"
+        content: "{{ wazuh_repo_line }}\n"
+
+    - name: Refresh apt cache after adding repo
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install Wazuh agent
+      ansible.builtin.apt:
+        name: wazuh-agent
+        state: present
+
+    - name: Check ossec.conf exists
+      ansible.builtin.stat:
+        path: /var/ossec/etc/ossec.conf
+      register: ossec_conf_stat
+
+    - name: Fail if ossec.conf is missing after agent install
+      ansible.builtin.fail:
+        msg: "/var/ossec/etc/ossec.conf absent après installation de wazuh-agent"
+      when: not ossec_conf_stat.stat.exists
+
+    - name: Stop agent before cleanup
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        state: stopped
+      failed_when: false
+
+    - name: Remove old client key
+      ansible.builtin.file:
+        path: /var/ossec/etc/client.keys
+        state: absent
+
+    - name: Remove invalid groups config
+      ansible.builtin.replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<groups>.*?</groups>'
+        replace: ''
+      failed_when: false
+
+    - name: Remove previous managed enrollment block
+      ansible.builtin.blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} ANSIBLE WAZUH AGENT ENROLLMENT -->"
+        state: absent
+
+    - name: Ensure agent name block
+      ansible.builtin.blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} ANSIBLE WAZUH AGENT ENROLLMENT -->"
+        insertafter: '<client>'
+        block: |
+          <enrollment>
+            <agent_name>{{ wazuh_agent_name }}</agent_name>
+          </enrollment>
+
+    - name: Ensure manager IP
+      ansible.builtin.replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<address>.*?</address>'
+        replace: '<address>{{ wazuh_manager_ip }}</address>'
+
+    - name: Ensure manager port
+      ansible.builtin.replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<port>.*?</port>'
+        replace: '<port>{{ wazuh_manager_port }}</port>'
+      failed_when: false
+
+    - name: Ensure manager protocol
+      ansible.builtin.replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<protocol>.*?</protocol>'
+        replace: '<protocol>{{ wazuh_manager_protocol }}</protocol>'
+      failed_when: false
+
+    - name: Enable agent service
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        enabled: true
+
+    - name: Start agent before enroll
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        state: started
+
+    - name: Wait a bit before enrollment
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Enroll agent
+      ansible.builtin.command: >
+        /var/ossec/bin/agent-auth
+        -m {{ wazuh_manager_ip }}
+        -A {{ wazuh_agent_name }}
+      register: enroll_result
+      failed_when:
+        - enroll_result.rc != 0
+        - "'Duplicate agent name' not in (enroll_result.stdout | default(''))"
+        - "'Duplicate agent name' not in (enroll_result.stderr | default(''))"
+        - "'already present' not in (enroll_result.stdout | default(''))"
+        - "'already present' not in (enroll_result.stderr | default(''))"
+      changed_when:
+        - "'Valid key received' in (enroll_result.stdout | default('')) or 'Valid key received' in (enroll_result.stderr | default(''))"
+
+    - name: Restart agent after enroll
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        state: restarted
+
+    - name: Show enrollment result
+      ansible.builtin.debug:
+        var: enroll_result.stdout_lines
+
+    - name: Show agent logs
+      ansible.builtin.shell: tail -n 30 /var/ossec/logs/ossec.log
+      register: agent_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Debug agent logs
+      ansible.builtin.debug:
+        var: agent_logs.stdout_lines

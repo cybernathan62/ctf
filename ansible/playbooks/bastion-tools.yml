@@ -1,0 +1,28 @@
+---
+- name: Install bastion admin tools
+  hosts: bastion
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install admin packages
+      apt:
+        name:
+          - curl
+          - wget
+          - vim
+          - git
+          - unzip
+          - net-tools
+          - dnsutils
+          - iputils-ping
+          - traceroute
+          - tcpdump
+          - nmap
+          - jq
+          - openssh-client
+        state: present

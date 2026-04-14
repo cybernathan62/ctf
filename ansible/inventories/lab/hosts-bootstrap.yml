@@ -1,0 +1,54 @@
+all:
+  children:
+    pfsense:
+      hosts:
+        pfsense-1:
+          ansible_host: host.docker.internal
+          ansible_port: 2321
+          ansible_user: admin
+          ansible_ssh_private_key_file: ../keys/ssh/pfsense/pfsense_admin
+
+        pfsense-2:
+          ansible_host: host.docker.internal
+          ansible_port: 2322
+          ansible_user: admin
+          ansible_ssh_private_key_file: ../keys/ssh/pfsense/pfsense_admin
+
+        pfsense-3:
+          ansible_host: host.docker.internal
+          ansible_port: 2323
+          ansible_user: admin
+          ansible_ssh_private_key_file: ../keys/ssh/pfsense/pfsense_admin
+
+    debian:
+      hosts:
+        bastion:
+          ansible_host: host.docker.internal
+          ansible_port: 2301
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+
+        dmz:
+          ansible_host: host.docker.internal
+          ansible_port: 2302
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+
+        zabbix:
+          ansible_host: host.docker.internal
+          ansible_port: 2304
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin
+
+        wazuh:
+          ansible_host: host.docker.internal
+          ansible_port: 2303
+          ansible_user: vagrant
+          ansible_ssh_private_key_file: ../keys/ssh/vagrant/vagrant.key.rsa
+          ansible_ssh_common_args: '-o IdentitiesOnly=yes -o PasswordAuthentication=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa -o StrictHostKeyChecking=no'
+
+        db-server:
+          ansible_host: host.docker.internal
+          ansible_port: 2305
+          ansible_user: debian
+          ansible_ssh_private_key_file: ../keys/ssh/debian/debian_admin

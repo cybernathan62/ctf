@@ -1,0 +1,26 @@
+---
+wazuh_version: "4.14.4"
+
+indexer_network_host: "10.2.50.10"
+indexer_http_port: 9200
+
+dashboard_server_host: "0.0.0.0"
+dashboard_server_port: 5601
+
+filebeat_output_indexer_hosts:
+  - "10.2.50.10:9200"
+
+wazuh_api_credentials:
+  - id: default
+    url: https://10.2.50.10
+    port: 55000
+    username: wazuh-wui
+    password: "ChangeMe_Strong_Wazuh_WUI"
+
+wazuh_managers:
+  - address: 10.2.50.10
+    port: 1514
+    protocol: tcp
+    api_port: 55000
+    api_user: wazuh
+    api_password: "ChangeMe_Strong_API"

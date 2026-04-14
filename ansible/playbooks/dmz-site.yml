@@ -1,0 +1,105 @@
+---
+- name: Deploy fake site on DMZ
+  hosts: dmz
+  become: true
+  gather_facts: true
+
+  vars:
+    local_site_dir: "/work/site/secondbyte-site/site"
+    remote_site_dir: "/var/www/secondbyte-site"
+    nginx_site_name: "secondbyte-site"
+
+  tasks:
+    - name: Install nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Ensure remote site directory exists
+      ansible.builtin.file:
+        path: "{{ remote_site_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+
+    - name: Check local fake site exists in controller
+      ansible.builtin.stat:
+        path: "{{ local_site_dir }}"
+      delegate_to: localhost
+      become: false
+      register: local_site_stat
+
+    - name: Fail if local fake site is missing
+      ansible.builtin.fail:
+        msg: "Le dossier local {{ local_site_dir }} est introuvable dans le projet."
+      when: not local_site_stat.stat.exists
+
+    - name: Copy fake site to DMZ
+      ansible.builtin.copy:
+        src: "{{ local_site_dir }}/"
+        dest: "{{ remote_site_dir }}/"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    - name: Deploy nginx site config
+      ansible.builtin.copy:
+        dest: "/etc/nginx/sites-available/{{ nginx_site_name }}"
+        mode: "0644"
+        content: |
+          server {
+              listen 80 default_server;
+              listen [::]:80 default_server;
+
+              server_name _;
+
+              root {{ remote_site_dir }};
+              index index.html;
+
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+          }
+      notify: Reload nginx
+
+    - name: Enable nginx site
+      ansible.builtin.file:
+        src: "/etc/nginx/sites-available/{{ nginx_site_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}"
+        state: link
+      notify: Reload nginx
+
+    - name: Disable default nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+    - name: Test nginx configuration
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Ensure nginx is enabled and started
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: true
+        state: started
+
+    - name: Test local site on DMZ
+      ansible.builtin.uri:
+        url: http://127.0.0.1
+        status_code: 200
+        return_content: true
+      register: dmz_site_test
+
+    - name: Show local site test result
+      ansible.builtin.debug:
+        msg: "Site DMZ OK, longueur réponse = {{ dmz_site_test.content | length }}"
+
+  handlers:
+    - name: Reload nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: reloaded

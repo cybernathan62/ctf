@@ -1,0 +1,72 @@
+---
+- name: Fix Wazuh server disk issues
+  hosts: wazuh_server
+  become: true
+
+  tasks:
+    - name: Stop Wazuh services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop:
+        - wazuh-dashboard
+        - wazuh-manager
+        - wazuh-indexer
+      ignore_errors: true
+
+    - name: Ensure offload directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: wazuh
+        mode: '0770'
+      loop:
+        - /data/wazuh-offload/tmp
+        - /data/wazuh-offload/vd
+
+    - name: Move tmp and vd if not already symlink
+      ansible.builtin.shell: |
+        if [ ! -L /var/ossec/tmp ]; then
+          mv /var/ossec/tmp /var/ossec/tmp.bak || true
+          ln -s /data/wazuh-offload/tmp /var/ossec/tmp
+        fi
+
+        if [ ! -L /var/ossec/queue/vd ]; then
+          mv /var/ossec/queue/vd /var/ossec/queue/vd.bak || true
+          ln -s /data/wazuh-offload/vd /var/ossec/queue/vd
+        fi
+      args:
+        executable: /bin/bash
+
+    - name: Fix permissions
+      ansible.builtin.file:
+        path: /data/wazuh-offload
+        state: directory
+        recurse: yes
+        owner: root
+        group: wazuh
+
+    - name: Clean backup leftovers
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/ossec/tmp.bak
+        - /var/ossec/queue/vd.bak
+      ignore_errors: true
+
+    - name: Clean system logs
+      ansible.builtin.shell: |
+        journalctl --vacuum-time=1d || true
+        apt-get clean || true
+
+    - name: Start Wazuh services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+        - wazuh-indexer
+        - wazuh-manager
+        - wazuh-dashboard

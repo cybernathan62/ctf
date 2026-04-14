@@ -1,0 +1,85 @@
+---
+- name: Deploy Wazuh agents
+  hosts: wazuh_agents
+  become: true
+
+  tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gnupg
+          - apt-transport-https
+        state: present
+        update_cache: true
+
+    - name: Ensure keyring directory exists
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Wazuh GPG key
+      ansible.builtin.get_url:
+        url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        dest: /tmp/GPG-KEY-WAZUH
+        mode: "0644"
+
+    - name: Convert Wazuh GPG key
+      ansible.builtin.shell: |
+        gpg --dearmor < /tmp/GPG-KEY-WAZUH > /usr/share/keyrings/wazuh.gpg
+      args:
+        creates: /usr/share/keyrings/wazuh.gpg
+
+    - name: Add Wazuh repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/wazuh.list
+        mode: "0644"
+        content: |
+          deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main
+
+    - name: Install Wazuh agent
+      ansible.builtin.apt:
+        name: wazuh-agent
+        state: present
+        update_cache: true
+
+    - name: Deploy ossec.conf
+      ansible.builtin.copy:
+        dest: /var/ossec/etc/ossec.conf
+        owner: root
+        group: wazuh
+        mode: "0640"
+        content: |
+          <ossec_config>
+            <client>
+              <server>
+                <address>{{ wazuh_manager_ip }}</address>
+                <port>{{ wazuh_manager_port }}</port>
+                <protocol>{{ wazuh_manager_protocol }}</protocol>
+              </server>
+              <config-profile>{{ inventory_hostname }}</config-profile>
+              <notify_time>10</notify_time>
+              <time-reconnect>60</time-reconnect>
+              <auto_restart>yes</auto_restart>
+            </client>
+
+            <client_buffer>
+              <disabled>no</disabled>
+              <queue_size>5000</queue_size>
+              <events_per_second>500</events_per_second>
+            </client_buffer>
+          </ossec_config>
+      notify: Restart wazuh-agent
+
+    - name: Enable and start Wazuh agent
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart wazuh-agent
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        state: restarted
