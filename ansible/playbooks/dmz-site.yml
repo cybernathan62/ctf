@@ -5,7 +5,7 @@
   gather_facts: true
 
   vars:
-    local_site_dir: "/work/site/secondbyte-site/site"
+    local_site_dir: "/lab/site/secondbyte-site/site"
     remote_site_dir: "/var/www/secondbyte-site"
     nginx_site_name: "secondbyte-site"
 

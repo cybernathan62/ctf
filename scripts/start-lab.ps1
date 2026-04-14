@@ -2,7 +2,8 @@ param(
     [switch]$SkipVmDeploy,
     [switch]$SkipPfSenseRestore,
     [switch]$SkipDebianCutover,
-    [switch]$SkipRuntimePing
+    [switch]$SkipRuntimePing,
+    [switch]$SkipBootstrapValidation
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +24,7 @@ $cutoverPlaybooks = @(
     "playbooks/zabbix-cutover.yml",
     "playbooks/db-server-cutover.yml",
     "playbooks/wazuh-cutover.yml",
+    "playbooks/dmz-cutover.yml",
     "playbooks/dmz-site.yml"
 )
 
@@ -244,14 +246,16 @@ try {
         }
     }
 
-    Invoke-Step -Title "ETAPE 3/6 - VALIDATION ANSIBLE BOOTSTRAP SUR DOCKER" -Action {
-        Invoke-AnsibleInDocker `
-            -StepName "Ping bootstrap Debian" `
-            -Command "ansible '$bootstrapDebianHosts' -i inventories/lab/hosts-bootstrap.yml -m ping -vv"
+    if (-not $SkipBootstrapValidation) {
+        Invoke-Step -Title "ETAPE 3/6 - VALIDATION ANSIBLE BOOTSTRAP SUR DOCKER" -Action {
+            Invoke-AnsibleInDocker `
+                -StepName "Ping bootstrap Debian" `
+                -Command "ansible '$bootstrapDebianHosts' -i inventories/lab/hosts-bootstrap.yml -m ping -vv"
 
-        Invoke-AnsibleInDocker `
-            -StepName "Ping bootstrap pfSense" `
-            -Command "ansible pfsense -i inventories/lab/hosts-bootstrap.yml -m ping -vv"
+            Invoke-AnsibleInDocker `
+                -StepName "Ping bootstrap pfSense" `
+                -Command "ansible pfsense -i inventories/lab/hosts-bootstrap.yml -m ping -vv"
+        }
     }
 
     if (-not $SkipPfSenseRestore) {
@@ -267,7 +271,7 @@ try {
     }
 
     if (-not $SkipDebianCutover) {
-        Invoke-Step -Title "ETAPE 5/6 - CUTOVER DEBIAN + DMZ SITE" -Action {
+        Invoke-Step -Title "ETAPE 5/6 - CUTOVER DEBIAN + DMZ CUTOVER + DMZ SITE" -Action {
             Invoke-AnsibleInDocker `
                 -StepName "Cutover bastion" `
                 -Command "ansible-playbook -i inventories/lab/hosts-bootstrap.yml playbooks/bastion-cutover.yml -vv"
@@ -285,8 +289,12 @@ try {
                 -Command "ansible-playbook -i inventories/lab/hosts-bootstrap.yml playbooks/wazuh-cutover.yml -vv"
 
             Invoke-AnsibleInDocker `
+                -StepName "Cutover dmz" `
+                -Command "ansible-playbook -i inventories/lab/hosts-bootstrap.yml playbooks/dmz-cutover.yml -vv"
+
+            Invoke-AnsibleInDocker `
                 -StepName "Déploiement site DMZ" `
-                -Command "ansible-playbook -i inventories/lab/hosts-bootstrap.yml playbooks/dmz-site.yml -vv"
+                -Command "ansible-playbook -i inventories/lab/hosts-runtime.yml playbooks/dmz-site.yml -vv"
         }
     }
 
